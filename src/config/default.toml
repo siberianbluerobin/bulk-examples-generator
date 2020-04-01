@@ -1,0 +1,31 @@
+# expand_limit: None,
+soft_limit = 10000
+hard_limit = 25000
+# Valor calculado a mano teniendo en cuenta que la profundidad a la que explota es 400
+limit_depth_level = 200
+c_factor = 1
+text_expand_limit = ""
+_dummy = false
+
+
+# Limit the elements generated in a ("example")* case
+# e.g 1, will be a probability of 0.5 of not generating nothing (0/1)
+# e.g 2, will be a probability of 0.33 of not generating nothing (0/1/2)
+# e.g 3, will be a probability of 0.25 of not generating nothing (0/1/2/3)
+upper_bound_zero_or_more_repetition = 5
+
+# Limit the elements generated in a ("example")+ case
+# e.g 2, will generate maximum 2 "example" strings
+# e.g 3, will generate maximum 3 "example" strings
+upper_bound_one_or_more_repetition = 5
+
+# Upper limit present in "at least" expression e{n,}
+# e.g 15, will generate between {n, n+15} "example" strings
+# e.g 20, will generate between {n, n+20} "example" strings
+upper_bound_at_least_repetition = 5
+
+# When generator finds an expression !A ~ B
+# It has to generate B and then probe that is not A
+# here you can limit the times that B is generated and compared with A
+# for more details please refer to README
+max_attempts_negation = 5

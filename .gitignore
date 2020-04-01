@@ -1,0 +1,8 @@
+/target
+**/*.rs.bk
+
+# If you’re building a non-end product, such as a rust library that other rust packages will depend on, put Cargo.lock in your .gitignore. If you’re building an end product, which are executable like command-line tool or an application, or a system library with crate-type of staticlib or cdylib, check Cargo.lock into git.
+Cargo.lock
+
+# Folder por testing grammars
+test-grammars/

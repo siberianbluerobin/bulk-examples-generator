@@ -1,0 +1,80 @@
+[package]
+name = "bulk_examples_generator"
+version = "0.1.0"
+authors = ["siberianbluerobin <n1xef5em4bp4@opayq.com>"]
+edition = "2018"
+description = "Create dozens/hundreds/thousands/millions of random examples based on a pest grammar (PEG). It can be used for generate string/structured data for training models in AI, or like a grammar fuzzer for find bugs."
+readme = "README.md"
+repository = "https://github.com/siberianbluerobin/bulk-examples-generator"
+license = "MIT"
+keywords = ["generator", "grammar", "random", "data"]
+categories = ["command-line-utilities", "parsing", "parser-implementations", "template-engine"]
+
+[lib]
+bench = false
+
+[[bin]]
+name = "bulk_examples_generator"
+path = "src/main.rs"
+bench = false
+
+[dependencies]
+# Minimum version supported according to 
+# 1.36
+
+# rand: 1.32.0 
+# structopt: 1.36
+
+# Random stuff
+rand = "0.6"
+
+# Meta crate of pest for access to grammar rules and their AST
+pest_meta = "2.1"
+pest_vm = "2.1"
+
+# Crate used to support the difference or negation operator ("!") in the generation of examples from grammar
+pest = "2.1"
+# pest_derive = "2.1"
+
+# Parallelization
+rayon = "1.0"
+
+# TODO: This funcionality is not tested correctly
+# Detect when the stack is near to being full by recursion
+stacker = "0.1"
+
+# Crate used for preprocessing the grammars replacing the builtin rules for their equivalents 
+aho-corasick = "0.7"
+
+# Support crates for regex expressions, used for replace special rules added to the PEST grammar
+regex = "1.2"
+
+# TODO: This crate is not used at the moment
+# Logging crate
+# env_logger = "0.6"
+
+
+#---------- Crates for binary
+
+# Command line support
+structopt = "^0.3.12"
+
+# Progress bar
+indicatif = "0.11"
+
+# Load TOML config for generator
+config = "^0.10.1"
+
+# Used for loading config in a struct with config crate
+serde_derive = "^1.0.8"
+serde = "^1.0.8"
+
+
+#----------- Benchmarks and other things
+
+[dev-dependencies]
+criterion = "^0.3.1"
+
+[[bench]]
+name = "basic_generation"
+harness = false
