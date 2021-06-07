@@ -7,7 +7,7 @@ description = "Create dozens/hundreds/thousands/millions of random examples base
 readme = "README.md"
 repository = "https://github.com/siberianbluerobin/bulk-examples-generator"
 license = "MIT"
-keywords = ["generator", "grammar", "random", "data"]
+keywords = ["generator", "grammar", "random", "data", "fuzzer"]
 categories = ["command-line-utilities", "parsing", "parser-implementations", "template-engine"]
 
 [lib]
