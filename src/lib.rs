@@ -24,7 +24,7 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 pub mod config;
 mod generator;
@@ -129,14 +129,18 @@ pub fn compile_grammar(grammar: String) -> Result<Grammar, Vec<HashMap<String, S
     })
 }
 
+/// # Generate examples
 /// Generate a number of examples with the grammar,start rule and config provided
 ///
 /// ```
-/// use bulk_examples_generator::config::GeneratorConfig;
-/// use bulk_examples_generator::parallel_generate_examples;
+/// use bulk_examples_generator::config::*;
+/// use bulk_examples_generator::generate_examples;
 ///
 /// // Default configuration for the generator
-/// let mut config: GeneratorConfig = Default::default();
+/// let mut gen_config: GeneratorConfig = Default::default();
+/// let mut exe_config: ExecutorConfig = Default::default();
+/// // exe_config.print_progress
+/// // exe_config.print_stdout
 ///
 /// // Grammar string
 /// let mut grammar = r#"
@@ -147,75 +151,33 @@ pub fn compile_grammar(grammar: String) -> Result<Grammar, Vec<HashMap<String, S
 ///     "#;
 ///
 /// // Generate the examples
-/// let results = parallel_generate_examples(
+/// let results = generate_examples(
 ///             grammar.to_string(),        // The grammar
 ///             5,                          // Quantity of examples
 ///             "sentence".to_string(),    // Start rule
-///             &config,                    // Config of the generator
-///             false,                      // Print progress
-///             false,                      // Print in stdout, false return a vector with the examples
+///             &gen_config,                    // Config of the generator
+///             &exe_config,                      // Print progress
 ///         );
 ///
 /// println!("{:?}", results);
 /// ```
-///
-pub fn parallel_generate_examples(
-    grammar_string: String,
-    quantity: u32,
-    start: String,
-    config: &GeneratorConfig,
-    print_progress: bool,
-    print_stdout: bool,
-) -> Vec<Result<String, String>> {
-    let input_data = InputData::new(grammar_string);
-    let mut vec = vec![];
-
-    // This mode is for avoid printing the examples, nothing special
-    // Nobody wants to generate examples and then discard all of them... right?
-    if config.benchmark_mode {
-        // Print examples as they are generated
-        (1..quantity + 1).into_par_iter().for_each(|_| {
-            // This isn't optimized by the compiler... right?
-            let _r = generator::generate_example(input_data.clone(), start.clone(), config);
-        });
-    } else if print_stdout {
-        // Print examples as they are generated
-        (1..quantity + 1).into_par_iter().for_each(|i| {
-            let r = generator::generate_example(input_data.clone(), start.clone(), config);
-            if print_progress {
-                println!("Example #{} generated:\r\n{}", i, r.unwrap());
-            } else {
-                println!("{}", r.unwrap());
-            }
-        });
-    } else {
-        vec = Vec::with_capacity(quantity as usize);
-        vec.par_extend((1..quantity + 1).into_par_iter().map(|i| {
-            let r = generator::generate_example(input_data.clone(), start.clone(), config);
-            if print_progress {
-                println!("Example #{} generated", i);
-            }
-            r
-        }));
-    }
-
-    vec
-}
-
-// pub fn gen_random_html_and_save(examples: u32,)
-// where>
-//     S: AsRef<Path>,
-// Creación de ejemplos recibiendo una gramática, numero de ejemplos, regla de inicio, path de guardado, nombre de archivos en formato "example-{}.ext"
+/// # Saving examples in a folder
 /// Generate and save a number of examples with the grammar,start rule and config provided
 ///
 /// ```ignore
 /// # // This doc_test is ignored because have side effects (the files)
-/// use std::path::Path;
-/// use bulk_examples_generator::config::GeneratorConfig;
-/// use bulk_examples_generator::parallel_generate_save_examples;
+/// use std::path::PathBuf;
+/// use bulk_examples_generator::config::*;
+/// use bulk_examples_generator::generate_save_examples;
 ///
 /// // Default configuration for the generator
 /// let mut config: GeneratorConfig = Default::default();
+///
+/// // Config folder
+/// let mut exe_config: ExecutorConfig = Default::default();
+/// // Folder to save the examples
+/// let path = PathBuf::from(r"C:\my-folder");
+/// exe_config.print_folder = Some(("hola-{}.txt".to_string(), path))
 ///
 /// // Grammar string
 /// let mut grammar = r#"
@@ -225,96 +187,187 @@ pub fn parallel_generate_examples(
 ///         sentence = {"I have been programming in " ~ language ~ " for " ~ daysNumber ~ "."}
 ///     "#;
 ///
-/// // Folder to save the examples
-/// let path = Path::new("./my-examples/");
-///
-/// let template_name = "relevant-example-{}.txt".to_string();
-///
 /// // Generate and save the examples
-/// let results = parallel_generate_save_examples(
+/// let results = generate_examples(
 ///             grammar.to_string(),       // The grammar
 ///             5,                         // Quantity of examples
 ///             "sentence".to_string(),   // Start rule
-///             path,                      // The folder to save the examples
-///             template_name,             // The name of the files saved
-///             &config,                   // Config of the generator
+///             &gen_config,                   // Config of the generator
+///             &exe_config,                   // Config of the executor
 ///         );
 ///
 /// ```
-pub fn parallel_generate_save_examples<S>(
+pub fn generate_examples(
     grammar_string: String,
     quantity: u32,
     start: String,
-    path: S,
-    name_format: String,
-    config: &GeneratorConfig,
-) where
-    S: AsRef<Path>,
-{
-    // use env_logger;
-    // env_logger::init();
-
-    let path_cloned = path.as_ref();
-
-    // Creación de la barra de progreso
-    let progress_bar = ProgressBar::new(quantity.into());
-    progress_bar.set_style(
-        ProgressStyle::default_bar()
-            .template(
-                "[{elapsed_precise}] {wide_bar} {pos:>3}/{len:3} {msg} {percent}% {eta_precise}",
-            )
-            .progress_chars("██░"),
-    );
-
-    // Forzar el pintado inicial de la barra
-    progress_bar.tick();
-
+    generator_config: &GeneratorConfig,
+    executor_config: &ExecutorConfig,
+) -> Vec<Result<String, String>> {
     let input_data = InputData::new(grammar_string);
+    if executor_config.parallel_mode {
+        return parallel_generate_examples(
+            input_data,
+            quantity,
+            start,
+            generator_config,
+            executor_config,
+        );
+    } else {
+        return sequential_generate_examples(
+            input_data,
+            quantity,
+            start,
+            generator_config,
+            executor_config,
+        );
+    }
+}
 
-    (0..quantity).into_par_iter().for_each(|i| {
-        // Generar el ejemplo
-        let r = generator::generate_example(input_data.clone(), start.clone(), config);
+fn parallel_generate_examples(
+    input_grammar: InputData,
+    quantity: u32,
+    start: String,
+    generator_config: &GeneratorConfig,
+    executor_config: &ExecutorConfig,
+) -> Vec<Result<String, String>> {
+    let vec = Arc::new(Mutex::new(vec![]));
 
-        match r {
-            Ok(example) => {
-                let new_path = path_cloned.join(name_format.replace("{}", &i.to_string()));
-                // println!("for {:?}", new_path);
+    // Create the progress bar
+    let progress_bar = ProgressBar::new(quantity.into());
+    if executor_config.print_progress_bar {
+        progress_bar.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "[{elapsed_precise}] {wide_bar} {pos:>3}/{len:3} {msg} {percent}% {eta_precise}",
+                )
+                .progress_chars("██░"),
+        );
 
-                // Guardar el archivo
-                let mut f = File::create(new_path).expect("Unable to create file");
-                f.write_all(example.as_bytes())
-                    .expect("Unable to write data");
+        // Force the initial paint
+        progress_bar.tick();
+    }
 
-                // Modificando la barra de progreso
-                progress_bar.inc(1);
-                // println!(
-                //     "HTML {} completado y guardado, total esperado {}",
-                //     i, examples
-                // );
-            }
-            Err(error) => {
-                println!("{}", error);
+    (1..quantity + 1).into_par_iter().for_each(|i| {
+        let r = generator::generate_example(input_grammar.clone(), start.clone(), generator_config);
+        if executor_config.print_progress_bar {
+            progress_bar.inc(1);
+        }
+        if executor_config.print_progress_text {
+            println!("Example #{} generated:\r\n{}", i, r.as_ref().unwrap());
+        }
+        if executor_config.print_stdout {
+            println!("{}", r.as_ref().unwrap());
+        }
+
+        if executor_config.return_vec {
+            vec.lock().unwrap().push(r.clone())
+        }
+
+        if let Some((name_format, folder_path)) = &executor_config.print_folder {
+            match r {
+                Ok(example) => {
+                    let new_path = folder_path.join(name_format.replace("{}", &i.to_string()));
+                    // println!("for {:?}", new_path);
+                    // Save the file
+                    let mut f = File::create(new_path).expect("Unable to create file");
+                    f.write_all(example.as_bytes())
+                        .expect(&format!("Unable to write data, example {}", i));
+                }
+                Err(error) => {
+                    println!("{}", error);
+                }
             }
         }
     });
 
-    // Terminando la barra de progreso
-    progress_bar.finish();
+    if executor_config.print_progress_bar {
+        progress_bar.finish();
+    }
+
+    Arc::try_unwrap(vec).unwrap().into_inner().unwrap()
+}
+
+fn sequential_generate_examples(
+    input_grammar: InputData,
+    quantity: u32,
+    start: String,
+    generator_config: &GeneratorConfig,
+    executor_config: &ExecutorConfig,
+) -> Vec<Result<String, String>> {
+    let mut vec = vec![];
+
+    // Create progress bar
+    let progress_bar = ProgressBar::new(quantity.into());
+    if executor_config.print_progress_bar {
+        progress_bar.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "[{elapsed_precise}] {wide_bar} {pos:>3}/{len:3} {msg} {percent}% {eta_precise}",
+                )
+                .progress_chars("██░"),
+        );
+
+        // Force the initial paint
+        progress_bar.tick();
+    }
+
+    for i in 1..quantity + 1 {
+        // Generate example
+        let r = generator::generate_example(input_grammar.clone(), start.clone(), generator_config);
+        if executor_config.print_progress_bar {
+            progress_bar.inc(1);
+        }
+        if executor_config.print_progress_text {
+            println!("Example #{} generated:\r\n{}", i, r.as_ref().unwrap());
+        }
+        if executor_config.print_stdout {
+            println!("{}", r.as_ref().unwrap());
+        }
+
+        if executor_config.return_vec {
+            vec.push(r.clone())
+        }
+
+        if let Some((name_format, folder_path)) = &executor_config.print_folder {
+            match r {
+                Ok(example) => {
+                    let new_path = folder_path.join(name_format.replace("{}", &i.to_string()));
+                    // println!("for {:?}", new_path);
+                    // Save the file
+                    let mut f = File::create(new_path).expect("Unable to create file");
+                    f.write_all(example.as_bytes())
+                        .expect(&format!("Unable to write data, example {}", i));
+                }
+                Err(error) => {
+                    println!("{}", error);
+                }
+            }
+        }
+    }
+
+    if executor_config.print_progress_bar {
+        progress_bar.finish();
+    }
+
+    vec
 }
 
 // Parsea `input` usando la gramática `grammar`, iniciando el parseo desde `rule`
 // retorna Ok si es exitoso el parseo, Err si no es posible parsear
 // Es usado en términos generales como shorcut en los tests para validar si una cadena generada, puede ser parseada por la misma gramatica que la genero
-/// Parse input with the provided grammar and start rule returns `Ok` if the parse is sucessfull, `Err` otherwise
+/// Parse input with the provided grammar and start rule; returns `Ok` if the parse is successful, `Err` otherwise
 ///
 /// It's used for validate the examples generated with the original grammar
 ///
 /// ```
-/// use bulk_examples_generator::config::GeneratorConfig;
-/// use bulk_examples_generator::{compile_grammar, parse_input, parallel_generate_examples};
+/// use bulk_examples_generator::config::*;
+/// use bulk_examples_generator::{compile_grammar, parse_input, generate_examples};
 ///
 /// // Default configuration for the generator
-/// let mut config: GeneratorConfig = Default::default();
+/// let mut gen_config: GeneratorConfig = Default::default();
+/// let mut exe_config: ExecutorConfig = Default::default();
+/// exe_config.return_vec = true;
 ///
 /// // Grammar string
 /// let mut grammar = r#"
@@ -328,13 +381,12 @@ pub fn parallel_generate_save_examples<S>(
 /// let grammar_ast = compile_grammar(grammar.to_string());
 ///
 /// // Generate the examples
-/// let results = parallel_generate_examples(
+/// let results = generate_examples(
 ///             grammar.to_string(),        // The grammar
 ///             1,                          // Quantity of examples
 ///             "sentences".to_string(),    // Start rule
-///             &config,                    // Config of the generator
-///             false,                      // Print progress
-///             false,                      // Print in stdout, false return a vector with the examples
+///             &gen_config,                    // Config of the generator
+///             &exe_config,                    // Config of the executor
 ///         );
 ///
 /// let one_example = results[0].as_ref().unwrap();
