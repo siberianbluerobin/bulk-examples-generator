@@ -1,4 +1,5 @@
-# expand_limit: None,
+# terminals_limit: None,
+# rule_expand_limit: None,
 soft_limit = 10000
 hard_limit = 25000
 # Valor calculado a mano teniendo en cuenta que la profundidad a la que explota es 400
