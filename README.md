@@ -21,14 +21,15 @@ Bulk Examples Generator is a tool created in Rust for create dozens/hundreds/tho
     - [Available functions](#available-functions)
   - [Syntax supported](#syntax-supported)
 - [Frequently Asked Questions](#frequently-asked-questions)
+- [LICENSE](#LICENSE)
 
 # Summary
 
 bulk_examples_generator come in two flavors: binary or crate (library).
 
-If you only want to generate examples see [Binary use](#binary-use)
+If you only want to generate examples see [Binary use](#binary-usage)
 
-If you want to use the crate for your own needs see [Crate use](#crate-use)
+If you want to use the crate for your own needs see [Crate use](#crate-usage)
 
 # Binary usage
 
@@ -637,3 +638,19 @@ Issues related:
 **I want to generate a million of examples using the crate, why not do you return a stream or observer/listener model or something like that?**
 
 Sorry for that. Currently I want to improve/test the syntax grammar and simplify the code, if you want to generate this amount of examples please call the functions with batches and create an issue for know the interest about that.
+
+## LICENSE
+
+Copyright 2020 siberianbluerobin
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
