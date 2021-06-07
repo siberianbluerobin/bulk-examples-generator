@@ -20,13 +20,14 @@ bench = false
 
 [dependencies]
 # Minimum version supported according to 
-# 1.36
+# 1.41
 
-# rand: 1.32.0 
+# rand: 1.36.0 
 # structopt: 1.36
+# regex: 1.41.0
 
 # Random stuff
-rand = "0.6"
+rand = "0.8"
 
 # Meta crate of pest for access to grammar rules and their AST
 pest_meta = "2.1"
@@ -47,7 +48,7 @@ stacker = "0.1"
 aho-corasick = "0.7"
 
 # Support crates for regex expressions, used for replace special rules added to the PEST grammar
-regex = "1.2"
+regex = "1.5"
 
 # TODO: This crate is not used at the moment
 # Logging crate
@@ -60,10 +61,10 @@ regex = "1.2"
 structopt = "^0.3.12"
 
 # Progress bar
-indicatif = "0.11"
+indicatif = "0.16"
 
 # Load TOML config for generator
-config = "^0.10.1"
+config = "^0.11"
 
 # Used for loading config in a struct with config crate
 serde_derive = "^1.0.8"

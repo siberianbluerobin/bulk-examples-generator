@@ -303,18 +303,12 @@ fn processing_stack_fn(
                     )
                 } else {
                     // let mut rng = rand::thread_rng();
-                    // Convert range to u32 and choose a random u32
-                    let random_u32 = rng.gen_range(
-                        initial_char.chars().next().unwrap() as u32,
-                        end_char.chars().next().unwrap() as u32 + 1,
-                    );
+                    let from = initial_char.chars().next().unwrap();
+                    let to = end_char.chars().next().unwrap();
+                    let random_char = rng.gen_range(from..=to);
 
-                    if let Some(random_char) = std::char::from_u32(random_u32) {
-                        count_output += 1;
-                        result.push(random_char);
-                    } else {
-                        // FIXME disparar un error de rango, es decir que no es unicode
-                    }
+                    count_output += 1;
+                    result.push(random_char);
                 }
             }
             // Matches the rule with the given name, e.g. `a`
@@ -662,7 +656,7 @@ fn processing_stack_fn(
                     upper_bound_repeated_sequence = 1;
                     upper_bound_repeated_one_sequence = 2;
                 } else if !bool_hard_limit {
-                    let num_reps = rng.gen_range(0, upper_bound_repeated_sequence);
+                    let num_reps = rng.gen_range(0..upper_bound_repeated_sequence);
                     (1..num_reps + 1).for_each(|rep| {
                         let mut new_context = context.clone();
                         new_context.breadth_count += rep as usize;
@@ -682,7 +676,7 @@ fn processing_stack_fn(
                     upper_bound_repeated_sequence = 1;
                     upper_bound_repeated_one_sequence = 2;
                 } else if !bool_hard_limit {
-                    let num_reps = rng.gen_range(1, upper_bound_repeated_one_sequence);
+                    let num_reps = rng.gen_range(1..upper_bound_repeated_one_sequence);
                     (1..num_reps + 1).for_each(|rep| {
                         let mut new_context = context.clone();
                         new_context.breadth_count += rep as usize;
@@ -739,11 +733,8 @@ fn processing_stack_fn(
                         &mut processing_stack,
                     )
                 } else if !bool_hard_limit {
-                    // Se suma 1 debido a que el rango es inclusive
-                    let num_reps = rng.gen_range(
-                        min_reps,
-                        min_reps + config.upper_bound_at_least_repetition + 1,
-                    );
+                    let max_reps = min_reps + config.upper_bound_at_least_repetition;
+                    let num_reps = rng.gen_range(*min_reps..=max_reps);
                     (1..num_reps + 1).for_each(|rep| {
                         let mut new_context = context.clone();
                         new_context.breadth_count += rep as usize;
@@ -772,8 +763,7 @@ fn processing_stack_fn(
                         &mut processing_stack,
                     )
                 } else if !bool_hard_limit {
-                    // Se suma 1 debido a que el rango es inclusive
-                    let num_reps = rng.gen_range(0, max_reps + 1);
+                    let num_reps = rng.gen_range(0..=*max_reps);
                     (1..num_reps + 1).for_each(|rep| {
                         let mut new_context = context.clone();
                         new_context.breadth_count += rep as usize;
@@ -802,8 +792,7 @@ fn processing_stack_fn(
                         &mut processing_stack,
                     )
                 } else if !bool_hard_limit {
-                    // Se suma 1 debido a que el rango es inclusive
-                    let num_reps = rng.gen_range(min_reps, max_reps + 1);
+                    let num_reps = rng.gen_range(*min_reps..=*max_reps);
                     (1..num_reps + 1).for_each(|rep| {
                         let mut new_context = context.clone();
                         new_context.breadth_count += rep as usize;
@@ -887,7 +876,7 @@ fn auxiliar_function(
         //     actual_expr, selected_choice
         // );
         // println!("Range selection: [{}, {})", 0, *choice_count + 1);
-        let num = rng.gen_range(0, *choice_count + 1);
+        let num = rng.gen_range(0..=*choice_count);
         if num == *choice_count {
             *selected_choice = Rc::clone(&actual_expr);
         }
