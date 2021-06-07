@@ -3,7 +3,9 @@
 #[macro_export]
 macro_rules! boilerplate_test_grammar {
     ($grammar_string:expr, $initial_rule:expr, $examples_generated:expr) => {
-        let config: GeneratorConfig = Default::default();
+        let gen_config: GeneratorConfig = Default::default();
+        let mut exe_config: ExecutorConfig = Default::default();
+        exe_config.print_stdout = false;
 
         let grammar_string = $grammar_string.to_string();
 
@@ -12,13 +14,12 @@ macro_rules! boilerplate_test_grammar {
         let g = compile_grammar(grammar_string.clone()).unwrap();
         //println!("{:?}", g);
 
-        let results = parallel_generate_examples(
+        let results = generate_examples(
             grammar_string,
             $examples_generated,
             $initial_rule.to_string(),
-            &config,
-            false,
-            false,
+            &gen_config,
+            &exe_config,
         );
 
         // println!("{:?}", results);
@@ -78,7 +79,7 @@ mod test {
 mod pest_rules {
     use bulk_examples_generator::config::*;
     use bulk_examples_generator::parse_input;
-    use bulk_examples_generator::{compile_grammar, parallel_generate_examples};
+    use bulk_examples_generator::{compile_grammar, generate_examples};
 
     /// expr{n} exactly n repetitions
     #[test]
