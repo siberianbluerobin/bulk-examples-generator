@@ -1,5 +1,9 @@
 # Bulk Examples Generator
 
+[![Build status](https://github.com/siberianbluerobin/bulk-examples-generator/workflows/Rust/badge.svg)](https://github.com/siberianbluerobin/bulk-examples-generator/actions)
+![Crates.io](https://img.shields.io/crates/v/bulk-examples-generator)
+![Crates.io](https://img.shields.io/crates/d/bulk-examples-generator)
+
 Bulk Examples Generator is a tool created in Rust for create dozens/hundreds/thousands/millions of random examples based on a pest grammar (PEG). It can be used for generate string/structured data for training models in AI, or like a grammar fuzzer for find bugs.
 
 # Table of Contents
