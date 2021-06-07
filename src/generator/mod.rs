@@ -5,7 +5,7 @@ use crate::parse_input;
 use pest_meta::ast::{Expr, Rule as AstRule};
 use rand::prelude::*;
 use regex::Regex;
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 #[derive(Clone, Debug)]
 pub struct Grammar {
@@ -111,11 +111,14 @@ pub fn traverse(
     // Stack usado para almacenar todos los términos sintácticos
     // weights, definitions_count, actual_definition, actual_term
     // Contexto, definicion anterior, definición actual, termino actual a procesar
-    let mut processing_stack: Vec<(Context, Option<AstRule>, AstRule, Expr)> = Vec::new();
+    let mut processing_stack: Vec<(Context, Option<Rc<AstRule>>, Rc<AstRule>, Rc<Expr>)> =
+        Vec::new();
 
     // Add first term
     let context: Context = Default::default();
-    processing_stack.push((context, None, rule.clone(), rule.expr));
+    let rc_rule = Rc::new(rule.clone());
+    let rc_expr = Rc::new(rule.expr);
+    processing_stack.push((context, None, rc_rule, rc_expr));
 
     // Variable que contiene la cadena generada
     let result = processing_terms(
@@ -136,7 +139,7 @@ fn processing_terms(
     rng: &mut ThreadRng,
     config: &GeneratorConfig,
     depth_level: usize,
-    processing_stack: Vec<(Context, Option<AstRule>, AstRule, Expr)>,
+    processing_stack: Vec<(Context, Option<Rc<AstRule>>, Rc<AstRule>, Rc<Expr>)>,
     dynamic_blacklist: &mut Vec<String>,
 ) -> Result<String, String> {
     // Call to processing_stack
@@ -152,16 +155,16 @@ fn processing_terms(
     Ok(result.unwrap().0)
 }
 
-/// Retorna (result, count_nodes_processed, count_expand_idents)
+/// Retorna (result, count_output, count_nodes_processed, count_expand_idents)
 /// el resultado en String, los nodos procesados por la función, y los identificadores expandidos (reglas)
 fn processing_stack_fn(
     input_data: &InputData,
     mut rng: &mut ThreadRng,
     config: &GeneratorConfig,
     depth_level: usize,
-    mut processing_stack: Vec<(Context, Option<AstRule>, AstRule, Expr)>,
+    mut processing_stack: Vec<(Context, Option<Rc<AstRule>>, Rc<AstRule>, Rc<Expr>)>,
     dynamic_blacklist: &mut Vec<String>,
-) -> Result<(String, usize, u32), String> {
+) -> Result<(String, usize, usize, usize), String> {
     // Variable que contiene la cadena generada
     let mut result = String::new();
 
@@ -183,13 +186,16 @@ fn processing_stack_fn(
         // )));
 
         // return Ok((result, 0, 0));
-        return Ok((config.text_expand_limit.to_owned(), 0, 0));
+        return Ok((config.text_expand_limit.to_owned(), 0, 0, 0));
     }
+
+    // Counter of the number of 'strings' or output generated
+    let mut count_output = 0;
 
     // Contador de la cantidad de expresiones que han sido procesadas
     let mut count_nodes_processed = 0;
 
-    // Contador de la cantidad de identificadores expandidos
+    // Contador de la cantidad de identificadores expandidos (rules)
     let mut count_expand_idents = 0;
 
     // Secuencia superior de repetición
@@ -213,14 +219,15 @@ fn processing_stack_fn(
     // 1 -> Ya se ha procesado uno de los dos últimos valores
     // 2 -> Ya se está procesando el último valor
     let mut last_processing_choice = -1;
-    let mut selected_choice = Expr::Str("RESERVED".to_string());
+    let mut selected_choice = Rc::new(Expr::Str("RESERVED".to_string()));
     let mut choice_count = 0;
 
     while let Some((context, previous_rule, actual_rule, actual_expr)) = processing_stack.pop() {
         // println!("TERM: {:?}", actual_expr);
         // result.push_str(" ' ");
 
-        match actual_expr.clone() {
+        match &*actual_expr {
+            // match actual_expr {
             // Matches an exact string, e.g. `"a"`
             Expr::Str(string) => {
                 if continue_processing_choice {
@@ -231,9 +238,9 @@ fn processing_stack_fn(
                         &mut continue_processing_choice,
                         &mut last_processing_choice,
                         context,
-                        actual_expr,
-                        actual_rule,
-                        previous_rule,
+                        Rc::clone(&actual_expr),
+                        Rc::clone(&actual_rule),
+                        previous_rule.clone(),
                         &mut processing_stack,
                     )
                 } else {
@@ -299,6 +306,7 @@ fn processing_stack_fn(
                             }
                         }
                     } else {
+                        count_output += 1;
                         result.push_str(&string);
                     }
                 }
@@ -323,6 +331,7 @@ fn processing_stack_fn(
 
                     // Random bool for transform to lowercase or uppercase
                     let tmp = rng.gen_bool(0.5);
+                    count_output += 1;
                     if tmp {
                         result.push_str(&string.to_lowercase());
                     } else {
@@ -354,6 +363,7 @@ fn processing_stack_fn(
                     );
 
                     if let Some(random_char) = std::char::from_u32(random_u32) {
+                        count_output += 1;
                         result.push(random_char);
                     } else {
                         // FIXME disparar un error de rango, es decir que no es unicode
@@ -376,11 +386,11 @@ fn processing_stack_fn(
                         &mut processing_stack,
                     )
                 } else {
-                    if config.expand_limit.is_none()
-                        || config.expand_limit.unwrap() > count_expand_idents
+                    if config.rule_expand_limit.is_none()
+                        || config.rule_expand_limit.unwrap() > count_expand_idents
                     {
-                        if !dynamic_blacklist.contains(&name) {
-                            match input_data.grammar.rules.get(&name) {
+                        if !dynamic_blacklist.contains(name) {
+                            match input_data.grammar.rules.get(name) {
                                 Some(new_rule) => {
                                     let mut new_context = context.clone();
                                     new_context.depth_count += 1;
@@ -388,8 +398,8 @@ fn processing_stack_fn(
                                     processing_stack.push((
                                         new_context,
                                         Some(actual_rule.clone()),
-                                        new_rule.clone(),
-                                        new_rule.clone().expr,
+                                        Rc::new(new_rule.clone()),
+                                        Rc::new(new_rule.expr.clone()),
                                     ));
                                     count_expand_idents += 1;
                                 }
@@ -416,11 +426,11 @@ fn processing_stack_fn(
                                     new_context,
                                     previous_rule.clone(),
                                     actual_rule.clone(),
-                                    actual_rule.clone().expr,
+                                    Rc::new(actual_rule.expr.clone()),
                                 ));
                             } else {
                                 match previous_rule {
-                                    Some(previous) => {
+                                    Some(ref previous) => {
                                         if verify_infinite_loop_blacklist(
                                             &input_data.clean_grammar,
                                             &previous.name.clone(),
@@ -431,8 +441,8 @@ fn processing_stack_fn(
                                             processing_stack.push((
                                                 new_context,
                                                 None,
-                                                previous.clone(),
-                                                actual_rule.clone().expr,
+                                                previous_rule.unwrap().clone(),
+                                                Rc::new(actual_rule.expr.clone()),
                                             ));
                                         }
                                     }
@@ -473,14 +483,14 @@ fn processing_stack_fn(
                         &mut processing_stack,
                     )
                 } else {
-                    match *lhs.clone() {
+                    match &**lhs {
                         // Si es una negación seguida de algo más el procesamiento implica un parseo
                         Expr::NegPred(neg_expr) => {
                             let mut new_processing_stack: Vec<(
                                 Context,
-                                Option<AstRule>,
-                                AstRule,
-                                Expr,
+                                Option<Rc<AstRule>>,
+                                Rc<AstRule>,
+                                Rc<Expr>,
                             )> = Vec::new();
 
                             // Add first term
@@ -490,7 +500,7 @@ fn processing_stack_fn(
                                 new_context,
                                 previous_rule.clone(),
                                 actual_rule.clone(),
-                                *rhs.clone(),
+                                Rc::new(*rhs.clone()),
                             ));
 
                             let mut invalid_neg_generation = false;
@@ -498,8 +508,8 @@ fn processing_stack_fn(
                             loop {
                                 // Se usa un valor más pequeño de soft limit y hard limit para reducir posibilidad de OVERFLOW STACK
                                 let mut new_config = config.clone();
-                                if let Some(exp_lim) = config.expand_limit {
-                                    new_config.expand_limit =
+                                if let Some(exp_lim) = config.rule_expand_limit {
+                                    new_config.rule_expand_limit =
                                         Some(exp_lim.saturating_sub(count_expand_idents));
                                 }
                                 new_config.soft_limit = 20;
@@ -516,6 +526,7 @@ fn processing_stack_fn(
                                 ) {
                                     Ok((
                                         result_neg,
+                                        neg_count_output,
                                         neg_count_nodes_processed,
                                         neg_count_expand_idents,
                                     )) => {
@@ -553,6 +564,7 @@ fn processing_stack_fn(
                                         // Si la secuencia generada es valida, es decir no hace parte de la negación se debe adicionar al string
                                         if !invalid_neg_generation {
                                             // Sumar los nodos que han sido procesados en la negación al conteo general
+                                            count_output += neg_count_output;
                                             count_nodes_processed += neg_count_nodes_processed;
                                             count_expand_idents += neg_count_expand_idents;
                                             result.push_str(&result_neg);
@@ -588,11 +600,16 @@ fn processing_stack_fn(
                                 new_context.clone(),
                                 previous_rule.clone(),
                                 actual_rule.clone(),
-                                *rhs,
+                                Rc::new(*rhs.clone()),
                             ));
 
                             new_context.breadth_count += 1;
-                            processing_stack.push((new_context, previous_rule, actual_rule, *lhs));
+                            processing_stack.push((
+                                new_context,
+                                previous_rule,
+                                actual_rule,
+                                Rc::new(*lhs.clone()),
+                            ));
                         }
                     }
                 }
@@ -602,7 +619,7 @@ fn processing_stack_fn(
                 // TODO debería hacer match también en rhs
                 // println!("Izquierda: {:?}", lhs.clone());
                 // println!("Derecha: {:?}", rhs.clone());
-                match *lhs.clone() {
+                match &**lhs {
                     Expr::Choice(_lhs_inner, _rhs_inner) => {
                         continue_processing_choice = true;
                         // selected_choice = *rhs.clone();
@@ -610,9 +627,14 @@ fn processing_stack_fn(
                             context.clone(),
                             previous_rule.clone(),
                             actual_rule.clone(),
-                            *lhs,
+                            Rc::new(*lhs.clone()),
                         ));
-                        processing_stack.push((context.clone(), previous_rule, actual_rule, *rhs));
+                        processing_stack.push((
+                            context.clone(),
+                            previous_rule,
+                            actual_rule,
+                            Rc::new(*rhs.clone()),
+                        ));
                     }
                     _ => {
                         if continue_processing_choice {
@@ -622,21 +644,25 @@ fn processing_stack_fn(
                                 context.clone(),
                                 previous_rule.clone(),
                                 actual_rule.clone(),
-                                *rhs,
+                                Rc::new(*rhs.clone()),
                             ));
                             processing_stack.push((
                                 context.clone(),
                                 previous_rule,
                                 actual_rule,
-                                *lhs,
+                                Rc::new(*lhs.clone()),
                             ));
                         } else {
                             // Reinicio de las variables de apoyo para selección
-                            selected_choice = Expr::Str("RESERVED".to_string());
+                            selected_choice = Rc::new(Expr::Str("RESERVED".to_string()));
                             continue_processing_choice = false;
                             choice_count = 0;
 
-                            let selected = *random_definition(&vec![lhs, rhs], &mut rng).unwrap();
+                            let selected = random_definition(
+                                &vec![(**lhs).clone(), (**rhs).clone()],
+                                &mut rng,
+                            )
+                            .unwrap();
                             // println!("SELECCTED: {:?}", &selected);
                             // processing_stack((Vec::new(), HashMap::new(), rule, rule.expr))
                             let mut new_context = context.clone();
@@ -645,7 +671,7 @@ fn processing_stack_fn(
                                 new_context,
                                 previous_rule,
                                 actual_rule,
-                                selected,
+                                Rc::new(selected),
                             ));
                         }
                     }
@@ -673,7 +699,12 @@ fn processing_stack_fn(
                     if option {
                         let mut new_context = context.clone();
                         new_context.breadth_count += 1;
-                        processing_stack.push((new_context, previous_rule, actual_rule, *expr));
+                        processing_stack.push((
+                            new_context,
+                            previous_rule,
+                            actual_rule,
+                            Rc::new(*expr.clone()),
+                        ));
                     }
                 }
             }
@@ -692,7 +723,7 @@ fn processing_stack_fn(
                             new_context,
                             previous_rule.clone(),
                             actual_rule.clone(),
-                            *expr.clone(),
+                            Rc::new(*expr.clone()),
                         ))
                     });
                 }
@@ -712,7 +743,7 @@ fn processing_stack_fn(
                             new_context,
                             previous_rule.clone(),
                             actual_rule.clone(),
-                            *expr.clone(),
+                            Rc::new(*expr.clone()),
                         ))
                     });
                 }
@@ -740,7 +771,7 @@ fn processing_stack_fn(
                             new_context,
                             previous_rule.clone(),
                             actual_rule.clone(),
-                            *expr.clone(),
+                            Rc::new(*expr.clone()),
                         ))
                     });
                 }
@@ -773,7 +804,7 @@ fn processing_stack_fn(
                             new_context,
                             previous_rule.clone(),
                             actual_rule.clone(),
-                            *expr.clone(),
+                            Rc::new(*expr.clone()),
                         ))
                     });
                 }
@@ -803,7 +834,7 @@ fn processing_stack_fn(
                             new_context,
                             previous_rule.clone(),
                             actual_rule.clone(),
-                            *expr.clone(),
+                            Rc::new(*expr.clone()),
                         ))
                     });
                 }
@@ -833,7 +864,7 @@ fn processing_stack_fn(
                             new_context,
                             previous_rule.clone(),
                             actual_rule.clone(),
-                            *expr.clone(),
+                            Rc::new(*expr.clone()),
                         ))
                     });
                 }
@@ -841,7 +872,11 @@ fn processing_stack_fn(
             //     Expr::Skip(Vec<String>),
             //     /// Matches an expression and pushes it to the stack, e.g. `push(e)`
             // Expr::Push(Box<Expr>),
-            _ => {}
+            Expr::PeekSlice(_, _) => {}
+            Expr::PosPred(_) => {}
+            Expr::NegPred(_) => {}
+            Expr::Skip(_) => {}
+            Expr::Push(_) => {}
         }
         // println!("{:?}", result);
         // println!("Len: {}", processing_stack.len());
@@ -851,19 +886,29 @@ fn processing_stack_fn(
         if count_nodes_processed > config.hard_limit {
             // Activar HARD LIMIT
             bool_hard_limit = true;
-            // println!("HARD LIMIT REACHED: {}", hard_limit);
+            // println!("HARD LIMIT REACHED: {}", config.hard_limit);
+            break;
+        }
+
+        if let Some(config_count) = config.terminals_limit {
+            if count_output >= config_count {
+                // println!("TERMINALS LIMIT REACHED: {}", config_count);
+                break;
+            }
         }
     }
 
     // println!("Nodes processed: {}", count_nodes_processed);
-    Ok((result, count_nodes_processed, count_expand_idents))
+    Ok((
+        result,
+        count_output,
+        count_nodes_processed,
+        count_expand_idents,
+    ))
 }
 
 /// Random entre Simbolos |
-pub fn random_definition(
-    definitions: &Vec<Box<Expr>>,
-    rng: &mut ThreadRng,
-) -> Result<Box<Expr>, String> {
+pub fn random_definition(definitions: &Vec<Expr>, rng: &mut ThreadRng) -> Result<Expr, String> {
     // println!("Selección aleatoria: {:?}", &definitions);
     match definitions.choose(rng) {
         Some(selected) => {
@@ -877,17 +922,17 @@ pub fn random_definition(
 fn auxiliar_function(
     rng: &mut ThreadRng,
     choice_count: &mut i32,
-    selected_choice: &mut Expr,
+    selected_choice: &mut Rc<Expr>,
     continue_processing_choice: &mut bool,
     last_processing_choice: &mut i8,
     context: Context,
-    actual_expr: Expr,
-    actual_rule: AstRule,
-    previous_rule: Option<AstRule>,
-    processing_stack: &mut Vec<(Context, Option<AstRule>, AstRule, Expr)>,
+    actual_expr: Rc<Expr>,
+    actual_rule: Rc<AstRule>,
+    previous_rule: Option<Rc<AstRule>>,
+    processing_stack: &mut Vec<(Context, Option<Rc<AstRule>>, Rc<AstRule>, Rc<Expr>)>,
 ) {
     if *choice_count == 0 {
-        *selected_choice = actual_expr;
+        *selected_choice = Rc::clone(&actual_expr);
         *choice_count += 1;
     } else {
         // println!(
@@ -897,7 +942,7 @@ fn auxiliar_function(
         // println!("Range selection: [{}, {})", 0, *choice_count + 1);
         let num = rng.gen_range(0, *choice_count + 1);
         if num == *choice_count {
-            *selected_choice = actual_expr;
+            *selected_choice = Rc::clone(&actual_expr);
         }
         // println!("Choice count: {} - Num: {}", choice_count, num);
         // println!("WIN: {:?}", selected_choice);
@@ -908,13 +953,13 @@ fn auxiliar_function(
                 context.clone(),
                 previous_rule.clone(),
                 actual_rule.clone(),
-                selected_choice.clone(),
+                Rc::clone(&selected_choice),
             ));
 
             // Reinicio de variables
             *last_processing_choice = -1;
             *continue_processing_choice = false;
-            *selected_choice = Expr::Str("RESERVED".to_string());
+            *selected_choice = Rc::new(Expr::Str("RESERVED".to_string()));
             // -1 Para evitar que RESERVED entre en comparación
             // choice_count al final de esta sección terminaria valiendo cero
             *choice_count = -1;
