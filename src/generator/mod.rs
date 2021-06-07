@@ -245,66 +245,13 @@ fn processing_stack_fn(
                     )
                 } else {
                     if string.starts_with("|BLACKLIST|I|") {
-                        // Adicionar un ident a la blacklist
-                        let blacklisted_idents = string
-                            .trim_start_matches("|BLACKLIST|I|")
-                            .trim_end_matches("|")
-                            .split(",");
-                        for ident in blacklisted_idents {
-                            if let Some(mut rules) =
-                                rule_is_only_ident_choices(&input_data.clean_grammar, &ident)
-                            {
-                                // Si la regla se compone unicamente de choices donde cada choice es un ident, adicionar todas las choices
-                                // println!("{:?}", rules);
-                                dynamic_blacklist.append(&mut rules);
-                            } else {
-                                // sino solo adicionar la regla
-                                dynamic_blacklist.push(ident.to_string());
-                            }
-                        }
+                        add_blacklist_items(dynamic_blacklist, string, &input_data.clean_grammar);
                     } else if string.starts_with("|BLACKLIST|R|") {
-                        // Remover un ident de la blacklist
-                        let blacklisted_idents = string
-                            .trim_start_matches("|BLACKLIST|R|")
-                            .trim_end_matches("|")
-                            .split(",");
-
-                        for ident in blacklisted_idents {
-                            if let Some(rules) =
-                                rule_is_only_ident_choices(&input_data.clean_grammar, &ident)
-                            {
-                                // Si la regla se compone unicamente de choices donde cada choice es un ident, remover todas las choices
-                                // dynamic_blacklist.retain(|r| !rules.contains(r));
-
-                                // Solo se remueve la ultima ocurrencia encontrada para evitar problemas de remover un item de la blacklist en
-                                // profundidad por ejemplo |BLACKLIST|I|ThingWithA|  |BLACKLIST|I|A| / |BLACKLIST|R|A| |BLACKLIST|R|ThingWithA|
-                                for rule in rules {
-                                    // println!("{:?}", rule);
-                                    // println!("Antes: {:?}", dynamic_blacklist);
-                                    let index = dynamic_blacklist
-                                        .iter()
-                                        .rev()
-                                        .position(|x| *x == rule)
-                                        .unwrap();
-                                    // println!("Index: {:?}", index);
-                                    // println!("Nuevo Index: {:?}", dynamic_blacklist.len() - 1 - index);
-
-                                    // Puesto que la position obtenida es la invertida, debido a que el iterador recorre al reves
-                                    // es necesario hacer el siguiente calculo para poder obtener la posición correcta
-                                    // index + len_lista % len_lista => posición
-                                    dynamic_blacklist.remove(dynamic_blacklist.len() - 1 - index);
-                                    // println!("Despues: {:?}", dynamic_blacklist);
-                                }
-                            } else {
-                                // sino solo remover la regla
-                                let index = dynamic_blacklist
-                                    .iter()
-                                    .rev()
-                                    .position(|x| *x == ident)
-                                    .unwrap();
-                                dynamic_blacklist.remove(dynamic_blacklist.len() - 1 - index);
-                            }
-                        }
+                        remove_blacklist_items(
+                            dynamic_blacklist,
+                            string,
+                            &input_data.clean_grammar,
+                        );
                     } else {
                         count_output += 1;
                         result.push_str(&string);
@@ -1038,6 +985,60 @@ fn verify_infinite_loop_blacklist(grammar: &Grammar, ident: &str, blacklist: &Ve
             false
         }
         None => false,
+    }
+}
+
+fn add_blacklist_items(blacklist: &mut Vec<String>, string: &String, grammar: &Grammar) {
+    // Adicionar un ident a la blacklist
+    let blacklisted_idents = string
+        .trim_start_matches("|BLACKLIST|I|")
+        .trim_end_matches("|")
+        .split(",");
+
+    for ident in blacklisted_idents {
+        if let Some(mut rules) = rule_is_only_ident_choices(grammar, &ident) {
+            // Si la regla se compone unicamente de choices donde cada choice es un ident, adicionar todas las choices
+            // println!("{:?}", rules);
+            blacklist.append(&mut rules);
+        } else {
+            // sino solo adicionar la regla
+            blacklist.push(ident.to_string());
+        }
+    }
+}
+
+fn remove_blacklist_items(blacklist: &mut Vec<String>, string: &String, grammar: &Grammar) {
+    // Remover un ident de la blacklist
+    let blacklisted_idents = string
+        .trim_start_matches("|BLACKLIST|R|")
+        .trim_end_matches("|")
+        .split(",");
+
+    for ident in blacklisted_idents {
+        if let Some(rules) = rule_is_only_ident_choices(grammar, &ident) {
+            // Si la regla se compone unicamente de choices donde cada choice es un ident, remover todas las choices
+            // dynamic_blacklist.retain(|r| !rules.contains(r));
+
+            // Solo se remueve la ultima ocurrencia encontrada para evitar problemas de remover un item de la blacklist en
+            // profundidad por ejemplo |BLACKLIST|I|ThingWithA|  |BLACKLIST|I|A| / |BLACKLIST|R|A| |BLACKLIST|R|ThingWithA|
+            for rule in rules {
+                // println!("{:?}", rule);
+                // println!("Antes: {:?}", dynamic_blacklist);
+                let index = blacklist.iter().rev().position(|x| *x == rule).unwrap();
+                // println!("Index: {:?}", index);
+                // println!("Nuevo Index: {:?}", blacklist.len() - 1 - index);
+
+                // Puesto que la position obtenida es la invertida, debido a que el iterador recorre al reves
+                // es necesario hacer el siguiente calculo para poder obtener la posición correcta
+                // index + len_lista % len_lista => posición
+                blacklist.remove(blacklist.len() - 1 - index);
+                // println!("Despues: {:?}", blacklist);
+            }
+        } else {
+            // sino solo remover la regla
+            let index = blacklist.iter().rev().position(|x| *x == ident).unwrap();
+            blacklist.remove(blacklist.len() - 1 - index);
+        }
     }
 }
 
