@@ -333,7 +333,7 @@ There are 8 parameters that you can use in a config file
 
 ### Global parameters
 
-**expand_limit**
+**rule_expand_limit**
 
 Max rules opened in generation, when this limit is reached the generation of subsequent rules return the parameter text_expand_limit.
 
@@ -453,6 +453,23 @@ Readme grammar example  time:   [7.9290 ms 8.0080 ms 8.0937 ms]
 slope  [7.9290 ms 8.0937 ms] R^2            [0.6422301 0.6410218]
 mean   [7.5284 ms 7.8428 ms] std. dev.      [747.06 us 860.73 us]
 median [7.6470 ms 8.0680 ms] med. abs. dev. [686.19 us 1.3668 ms]
+```
+
+New benchmark Jun-2021
+
+```
+Benchmarking Readme grammar example: Warming up for 3.0000 s
+Benchmarking Readme grammar example: Collecting 100 samples in estimated 138.80 s (20200 iterations)
+Benchmarking Readme grammar example: Analyzing
+Readme grammar example  time:   [7.4982 ms 7.5840 ms 7.6814 ms]
+                        change: [-10.189% -5.8277% -1.4957%] (p = 0.01 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) low mild
+  2 (2.00%) high mild
+slope  [7.4982 ms 7.6814 ms] R^2            [0.7383475 0.7358064]
+mean   [7.2511 ms 7.4889 ms] std. dev.      [498.21 us 713.18 us]
+median [7.3367 ms 7.5408 ms] med. abs. dev. [304.45 us 576.03 us]
 ```
 
 This test doesn't include the time required for print or save the examples, just the time that take generate the examples.
