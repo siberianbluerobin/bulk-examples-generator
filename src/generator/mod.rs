@@ -31,6 +31,15 @@ impl InputData {
         }
     }
 }
+/// Enum used to decide if to continue processing a choice expression
+enum ProcessingChoices {
+    /// Expr
+    LastOne,
+    /// Expr | Expr
+    LastTwo,
+    /// No Choices are being processed
+    No,
+}
 
 /// Estructura de contexto, para guardar datos del estado actual de cada elemento a procesar
 ///  Some((weights, choices_count, previous_rule, actual_rule, actual_expr))
@@ -212,13 +221,12 @@ fn processing_stack_fn(
 
     // Variable de control usada para decidir si se debe seguir procesando una expr choice recursivamente
     let mut continue_processing_choice = false;
-    // Variable usada para decidir si el procesamiento de opciones aleatorias es detenido por no existir más opciones disponibles
-    // Valores posibles
+
     // -1 -> No se están procesando valores
     // 0 -> Aún se continúan procesando valores
     // 1 -> Ya se ha procesado uno de los dos últimos valores
     // 2 -> Ya se está procesando el último valor
-    let mut last_processing_choice = -1;
+    let mut last_processing_choice = ProcessingChoices::No;
     let mut selected_choice = Rc::new(Expr::Str("RESERVED".to_string()));
     let mut choice_count = 0;
 
@@ -580,7 +588,7 @@ fn processing_stack_fn(
                     _ => {
                         if continue_processing_choice {
                             // Hora de procesar las últimas dos opciones
-                            last_processing_choice = 0;
+                            last_processing_choice = ProcessingChoices::LastTwo;
                             processing_stack.push((
                                 context.clone(),
                                 previous_rule.clone(),
@@ -860,7 +868,7 @@ fn auxiliar_function(
     choice_count: &mut i32,
     selected_choice: &mut Rc<Expr>,
     continue_processing_choice: &mut bool,
-    last_processing_choice: &mut i8,
+    last_processing_choice: &mut ProcessingChoices,
     context: Context,
     actual_expr: Rc<Expr>,
     actual_rule: Rc<AstRule>,
@@ -884,26 +892,28 @@ fn auxiliar_function(
         // println!("WIN: {:?}", selected_choice);
         // println!("Last processing choice: {:?}", last_processing_choice);
 
-        if *last_processing_choice == 1 {
-            processing_stack.push((
-                context.clone(),
-                previous_rule.clone(),
-                actual_rule.clone(),
-                Rc::clone(&selected_choice),
-            ));
+        match *last_processing_choice {
+            ProcessingChoices::LastOne => {
+                processing_stack.push((
+                    context.clone(),
+                    previous_rule.clone(),
+                    actual_rule.clone(),
+                    Rc::clone(&selected_choice),
+                ));
 
-            // Reinicio de variables
-            *last_processing_choice = -1;
-            *continue_processing_choice = false;
-            *selected_choice = Rc::new(Expr::Str("RESERVED".to_string()));
-            // -1 Para evitar que RESERVED entre en comparación
-            // choice_count al final de esta sección terminaria valiendo cero
-            *choice_count = -1;
-        }
-
-        // Si se estan procesando las últimas dos opciones posibles
-        if *last_processing_choice == 0 {
-            *last_processing_choice += 1;
+                // Reinicio de variables
+                *last_processing_choice = ProcessingChoices::No;
+                *continue_processing_choice = false;
+                *selected_choice = Rc::new(Expr::Str("RESERVED".to_string()));
+                // -1 Para evitar que RESERVED entre en comparación
+                // choice_count al final de esta sección terminaria valiendo cero
+                *choice_count = -1;
+            }
+            // Si se estan procesando las últimas dos opciones posibles
+            ProcessingChoices::LastTwo => {
+                *last_processing_choice = ProcessingChoices::LastOne;
+            }
+            ProcessingChoices::No => {}
         }
         *choice_count += 1;
     }
